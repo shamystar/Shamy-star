@@ -2,6 +2,8 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 from datetime import date
+from dateutil.relativedelta import relativedelta
+
 
 # =========================================================
 # CONFIGURACIÓN GENERAL
@@ -11,6 +13,7 @@ st.set_page_config(
     page_icon="💻",
     layout="wide"
 )
+
 
 # =========================================================
 # CONEXIÓN A SUPABASE
@@ -22,7 +25,9 @@ def conectar_supabase():
 
     return create_client(url, key)
 
+
 supabase: Client = conectar_supabase()
+
 
 # =========================================================
 # ESTILOS
@@ -30,32 +35,33 @@ supabase: Client = conectar_supabase()
 st.markdown("""
 <style>
 
-    .titulo-principal {
-        font-size: 38px;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
+.titulo-principal {
+    font-size: 38px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
 
-    .subtitulo {
-        font-size: 17px;
-        color: gray;
-        margin-bottom: 25px;
-    }
+.subtitulo {
+    font-size: 17px;
+    color: gray;
+    margin-bottom: 25px;
+}
 
-    div[data-testid="stMetric"] {
-        border: 1px solid rgba(128,128,128,0.2);
-        padding: 15px;
-        border-radius: 12px;
-    }
+div[data-testid="stMetric"] {
+    border: 1px solid rgba(128,128,128,0.25);
+    padding: 15px;
+    border-radius: 12px;
+}
 
-    div[data-testid="stForm"] {
-        border: 1px solid rgba(128,128,128,0.25);
-        padding: 20px;
-        border-radius: 15px;
-    }
+div[data-testid="stForm"] {
+    border: 1px solid rgba(128,128,128,0.25);
+    padding: 20px;
+    border-radius: 15px;
+}
 
 </style>
 """, unsafe_allow_html=True)
+
 
 # =========================================================
 # FUNCIONES PARA OBTENER DATOS
@@ -112,21 +118,70 @@ def obtener_responsables():
 
 
 # =========================================================
+# GENERAR CÓDIGO AUTOMÁTICO
+# =========================================================
+def generar_codigo_equipo(lista_equipos):
+
+    if not lista_equipos:
+        return "EQ001"
+
+    numeros = []
+
+    for equipo in lista_equipos:
+
+        codigo = equipo.get("codigo", "")
+
+        if codigo.startswith("EQ"):
+
+            try:
+                numero = int(codigo.replace("EQ", ""))
+                numeros.append(numero)
+
+            except:
+                pass
+
+    if not numeros:
+        return "EQ001"
+
+    siguiente = max(numeros) + 1
+
+    return f"EQ{siguiente:03d}"
+
+
+# =========================================================
+# FUNCIÓN PARA CONVERTIR FECHAS
+# =========================================================
+def fecha_segura(valor):
+
+    if not valor:
+        return date.today()
+
+    try:
+        return pd.to_datetime(valor).date()
+
+    except:
+        return date.today()
+
+
+# =========================================================
 # CARGAR DATOS
 # =========================================================
 equipos = obtener_equipos()
 marcas = obtener_marcas()
 responsables = obtener_responsables()
 
+
 dic_marcas = {
     item["codigo_marca"]: item["marca"]
     for item in marcas
 }
 
+
 dic_responsables = {
     item["codigo_responsable"]: item["responsable"]
     for item in responsables
 }
+
 
 # =========================================================
 # MENÚ LATERAL
@@ -139,6 +194,7 @@ st.sidebar.write(
 
 st.sidebar.divider()
 
+
 menu = st.sidebar.radio(
     "Menú principal",
     [
@@ -149,9 +205,11 @@ menu = st.sidebar.radio(
     ]
 )
 
+
 st.sidebar.divider()
 
 st.sidebar.success("✅ Conectado a Supabase")
+
 
 # =========================================================
 # DASHBOARD
@@ -168,6 +226,7 @@ if menu == "🏠 Dashboard":
         unsafe_allow_html=True
     )
 
+
     total_registros = len(equipos)
 
     total_cantidad = sum(
@@ -175,67 +234,82 @@ if menu == "🏠 Dashboard":
         for e in equipos
     )
 
+
     operativos = sum(
         1 for e in equipos
         if e.get("estado") == "Operativo"
     )
+
 
     mantenimiento = sum(
         1 for e in equipos
         if e.get("estado") == "Mantenimiento"
     )
 
+
     inoperativos = sum(
         1 for e in equipos
         if e.get("estado") == "Inoperativo"
     )
 
+
     col1, col2, col3, col4 = st.columns(4)
 
+
     col1.metric(
-        "💻 Tipos de equipos",
+        "💻 Registros",
         total_registros
     )
+
 
     col2.metric(
         "📦 Cantidad total",
         total_cantidad
     )
 
+
     col3.metric(
         "✅ Operativos",
         operativos
     )
+
 
     col4.metric(
         "🔧 Mantenimiento",
         mantenimiento
     )
 
+
     st.divider()
 
+
     col1, col2 = st.columns(2)
+
 
     with col1:
 
         st.subheader("📊 Estado de equipos")
 
         datos_estado = pd.DataFrame({
+
             "Estado": [
                 "Operativo",
                 "Mantenimiento",
                 "Inoperativo"
             ],
+
             "Cantidad": [
                 operativos,
                 mantenimiento,
                 inoperativos
             ]
+
         })
 
         st.bar_chart(
             datos_estado.set_index("Estado")
         )
+
 
     with col2:
 
@@ -243,7 +317,7 @@ if menu == "🏠 Dashboard":
 
         st.info(
             f"""
-            **Equipos registrados:** {total_registros}
+            **Registros de equipos:** {total_registros}
 
             **Marcas registradas:** {len(marcas)}
 
@@ -253,8 +327,9 @@ if menu == "🏠 Dashboard":
             """
         )
 
+
 # =========================================================
-# MÓDULO EQUIPOS
+# EQUIPOS
 # =========================================================
 elif menu == "💻 Equipos":
 
@@ -264,9 +339,10 @@ elif menu == "💻 Equipos":
     )
 
     st.markdown(
-        '<div class="subtitulo">Registrar, consultar, modificar y eliminar equipos</div>',
+        '<div class="subtitulo">Registro, consulta, actualización y eliminación de equipos</div>',
         unsafe_allow_html=True
     )
+
 
     tab1, tab2, tab3, tab4 = st.tabs([
         "📋 Ver equipos",
@@ -275,31 +351,92 @@ elif menu == "💻 Equipos":
         "🗑️ Eliminar"
     ])
 
+
     # =====================================================
-    # READ
+    # VER EQUIPOS
     # =====================================================
     with tab1:
 
         st.subheader("📋 Lista de equipos")
 
+
         if equipos:
 
             df = pd.DataFrame(equipos)
 
-            if "marca" in df.columns:
-                df["Marca"] = df["marca"].map(dic_marcas)
 
-            if "responsable" in df.columns:
-                df["Responsable"] = df["responsable"].map(
-                    dic_responsables
-                )
-
-            buscar = st.text_input(
-                "🔎 Buscar equipo",
-                placeholder="Buscar por código, descripción, marca..."
+            # Mostrar nombres
+            df["nombre_marca"] = (
+                df["marca"]
+                .map(dic_marcas)
+                .fillna(df["marca"])
             )
 
+
+            df["nombre_responsable"] = (
+                df["responsable"]
+                .map(dic_responsables)
+                .fillna(df["responsable"])
+            )
+
+
+            st.markdown("### 🔎 Filtros")
+
+
+            col1, col2, col3, col4 = st.columns(4)
+
+
+            with col1:
+
+                buscar = st.text_input(
+                    "Buscar",
+                    placeholder="Código o descripción..."
+                )
+
+
+            with col2:
+
+                filtro_marca = st.selectbox(
+                    "Marca",
+                    ["Todas"] + list(dic_marcas.keys()),
+                    format_func=lambda x:
+                    "Todas las marcas"
+                    if x == "Todas"
+                    else f"{x} - {dic_marcas[x]}"
+                )
+
+
+            with col3:
+
+                filtro_responsable = st.selectbox(
+                    "Responsable",
+                    ["Todos"] + list(dic_responsables.keys()),
+                    format_func=lambda x:
+                    "Todos los responsables"
+                    if x == "Todos"
+                    else f"{x} - {dic_responsables[x]}"
+                )
+
+
+            with col4:
+
+                filtro_estado = st.selectbox(
+                    "Estado",
+                    [
+                        "Todos",
+                        "Operativo",
+                        "Mantenimiento",
+                        "Inoperativo"
+                    ]
+                )
+
+
+            # -----------------------------
+            # FILTRO POR TEXTO
+            # -----------------------------
             if buscar:
+
+                buscar = buscar.lower()
 
                 df = df[
                     df.astype(str)
@@ -307,78 +444,165 @@ elif menu == "💻 Equipos":
                         lambda fila:
                         fila.str.lower()
                         .str.contains(
-                            buscar.lower()
+                            buscar,
+                            na=False
                         )
                         .any(),
                         axis=1
                     )
                 ]
 
+
+            # -----------------------------
+            # FILTRO POR MARCA
+            # -----------------------------
+            if filtro_marca != "Todas":
+
+                df = df[
+                    df["marca"] == filtro_marca
+                ]
+
+
+            # -----------------------------
+            # FILTRO POR RESPONSABLE
+            # -----------------------------
+            if filtro_responsable != "Todos":
+
+                df = df[
+                    df["responsable"]
+                    == filtro_responsable
+                ]
+
+
+            # -----------------------------
+            # FILTRO POR ESTADO
+            # -----------------------------
+            if filtro_estado != "Todos":
+
+                df = df[
+                    df["estado"]
+                    == filtro_estado
+                ]
+
+
+            st.write(
+                f"**Resultados encontrados:** {len(df)}"
+            )
+
+
             columnas = [
+
                 "codigo",
                 "descripcion",
-                "marca",
-                "Marca",
+                "nombre_marca",
                 "estado",
                 "fecha_adquisicion",
                 "fecha_ult_mant",
                 "fecha_prox_mant",
-                "responsable",
-                "Responsable",
+                "nombre_responsable",
                 "cantidad"
+
             ]
 
-            columnas = [
-                c for c in columnas
-                if c in df.columns
+
+            df_mostrar = df[columnas].copy()
+
+
+            df_mostrar.columns = [
+
+                "Código",
+                "Descripción",
+                "Marca",
+                "Estado",
+                "Fecha adquisición",
+                "Último mantenimiento",
+                "Próximo mantenimiento",
+                "Responsable",
+                "Cantidad"
+
             ]
+
 
             st.dataframe(
-                df[columnas],
+                df_mostrar,
                 use_container_width=True,
                 hide_index=True
             )
 
+
         else:
-            st.info("No existen equipos registrados.")
+
+            st.info(
+                "No existen equipos registrados."
+            )
+
 
     # =====================================================
-    # CREATE
+    # REGISTRAR EQUIPO
     # =====================================================
     with tab2:
 
         st.subheader("➕ Registrar nuevo equipo")
 
+
         if not marcas:
+
             st.warning(
-                "Primero debes registrar al menos una marca."
+                "Primero debes registrar una marca."
             )
+
 
         elif not responsables:
+
             st.warning(
-                "Primero debes registrar al menos un responsable."
+                "Primero debes registrar un responsable."
             )
 
+
         else:
+
+            nuevo_codigo = generar_codigo_equipo(
+                equipos
+            )
+
+
+            st.info(
+                f"🔢 El código será generado automáticamente: "
+                f"**{nuevo_codigo}**"
+            )
+
+
+            st.info(
+                "🛠️ El mantenimiento preventivo está programado "
+                "cada **12 meses**. La fecha del próximo mantenimiento "
+                "se calculará automáticamente a partir de la fecha "
+                "del último mantenimiento."
+            )
+
 
             with st.form(
                 "form_registrar_equipo",
                 clear_on_submit=True
             ):
 
+
                 col1, col2 = st.columns(2)
+
 
                 with col1:
 
-                    codigo = st.text_input(
-                        "Código del equipo",
-                        placeholder="Ejemplo: EQ016"
+                    st.text_input(
+                        "Código",
+                        value=nuevo_codigo,
+                        disabled=True
                     )
+
 
                     descripcion = st.text_input(
                         "Descripción",
                         placeholder="Ejemplo: Laptop para laboratorio"
                     )
+
 
                     marca = st.selectbox(
                         "Marca",
@@ -386,6 +610,7 @@ elif menu == "💻 Equipos":
                         format_func=lambda x:
                         f"{x} - {dic_marcas[x]}"
                     )
+
 
                     estado = st.selectbox(
                         "Estado",
@@ -396,12 +621,14 @@ elif menu == "💻 Equipos":
                         ]
                     )
 
+
                     cantidad = st.number_input(
                         "Cantidad",
                         min_value=1,
                         value=1,
                         step=1
                     )
+
 
                 with col2:
 
@@ -412,102 +639,111 @@ elif menu == "💻 Equipos":
                         f"{x} - {dic_responsables[x]}"
                     )
 
+
                     fecha_adquisicion = st.date_input(
                         "Fecha de adquisición",
                         value=date.today()
                     )
 
+
                     fecha_ult_mant = st.date_input(
-                        "Fecha último mantenimiento",
+                        "Fecha del último mantenimiento",
                         value=date.today()
                     )
 
-                    fecha_prox_mant = st.date_input(
-                        "Fecha próximo mantenimiento",
-                        value=date.today()
+
+                    # CALCULAR AUTOMÁTICAMENTE
+                    fecha_prox_mant = (
+                        fecha_ult_mant
+                        + relativedelta(months=12)
                     )
+
+
+                    st.date_input(
+                        "Fecha del próximo mantenimiento",
+                        value=fecha_prox_mant,
+                        disabled=True
+                    )
+
 
                 guardar = st.form_submit_button(
                     "💾 Registrar equipo",
                     use_container_width=True
                 )
 
+
                 if guardar:
 
-                    if codigo.strip() == "":
-                        st.warning(
-                            "Ingrese el código del equipo."
-                        )
+                    if descripcion.strip() == "":
 
-                    elif descripcion.strip() == "":
                         st.warning(
-                            "Ingrese la descripción."
+                            "Ingrese una descripción."
                         )
 
                     else:
 
                         try:
 
-                            existe = (
+                            # Se genera nuevamente antes de insertar
+                            # para evitar códigos repetidos
+                            codigo_final = generar_codigo_equipo(
+                                obtener_equipos()
+                            )
+
+
+                            fecha_prox_final = (
+                                fecha_ult_mant
+                                + relativedelta(months=12)
+                            )
+
+
+                            datos = {
+
+                                "codigo":
+                                    codigo_final,
+
+                                "descripcion":
+                                    descripcion.strip(),
+
+                                "marca":
+                                    marca,
+
+                                "estado":
+                                    estado,
+
+                                "fecha_adquisicion":
+                                    fecha_adquisicion.isoformat(),
+
+                                "fecha_ult_mant":
+                                    fecha_ult_mant.isoformat(),
+
+                                "fecha_prox_mant":
+                                    fecha_prox_final.isoformat(),
+
+                                "responsable":
+                                    responsable,
+
+                                "cantidad":
+                                    cantidad
+                            }
+
+
+                            (
                                 supabase
                                 .table("EQUIPOS LAB")
-                                .select("codigo")
-                                .eq(
-                                    "codigo",
-                                    codigo.upper().strip()
-                                )
+                                .insert(datos)
                                 .execute()
                             )
 
-                            if existe.data:
 
-                                st.error(
-                                    "Ya existe un equipo con ese código."
-                                )
+                            st.success(
+                                f"✅ Equipo {codigo_final} "
+                                f"registrado correctamente."
+                            )
 
-                            else:
 
-                                datos = {
-                                    "codigo":
-                                        codigo.upper().strip(),
+                            st.rerun()
 
-                                    "descripcion":
-                                        descripcion.strip(),
-
-                                    "marca":
-                                        marca,
-
-                                    "estado":
-                                        estado,
-
-                                    "fecha_adquisicion":
-                                        fecha_adquisicion.isoformat(),
-
-                                    "fecha_ult_mant":
-                                        fecha_ult_mant.isoformat(),
-
-                                    "fecha_prox_mant":
-                                        fecha_prox_mant.isoformat(),
-
-                                    "responsable":
-                                        responsable,
-
-                                    "cantidad":
-                                        cantidad
-                                }
-
-                                (
-                                    supabase
-                                    .table("EQUIPOS LAB")
-                                    .insert(datos)
-                                    .execute()
-                                )
-
-                                st.success(
-                                    "✅ Equipo registrado correctamente."
-                                )
-
-                                st.rerun()
 
                         except Exception as e:
 
@@ -515,43 +751,65 @@ elif menu == "💻 Equipos":
                                 f"Error al registrar: {e}"
                             )
 
+
     # =====================================================
-    # UPDATE
+    # ACTUALIZAR EQUIPO
     # =====================================================
     with tab3:
 
         st.subheader("✏️ Actualizar equipo")
 
+
         if equipos:
 
-            lista_equipos = [
+            opciones_equipos = [
                 e["codigo"]
                 for e in equipos
             ]
 
+
             codigo_seleccionado = st.selectbox(
-                "Selecciona un equipo",
-                lista_equipos,
-                key="actualizar_equipo"
+                "Seleccionar equipo",
+                opciones_equipos,
+                key="editar_equipo"
             )
+
 
             equipo = next(
                 (
                     e for e in equipos
-                    if e["codigo"] == codigo_seleccionado
+                    if e["codigo"]
+                    == codigo_seleccionado
                 ),
                 None
             )
 
+
             if equipo:
+
+                st.info(
+                    "🛠️ El próximo mantenimiento se calcula "
+                    "automáticamente **12 meses después** "
+                    "del último mantenimiento."
+                )
+
 
                 with st.form(
                     "form_actualizar_equipo"
                 ):
 
+
                     col1, col2 = st.columns(2)
 
+
                     with col1:
+
+                        st.text_input(
+                            "Código",
+                            value=codigo_seleccionado,
+                            disabled=True
+                        )
+
 
                         descripcion_edit = st.text_input(
                             "Descripción",
@@ -561,13 +819,16 @@ elif menu == "💻 Equipos":
                             )
                         )
 
+
                         lista_marcas = list(
                             dic_marcas.keys()
                         )
 
+
                         marca_actual = equipo.get(
                             "marca"
                         )
+
 
                         indice_marca = (
                             lista_marcas.index(
@@ -578,6 +839,7 @@ elif menu == "💻 Equipos":
                             else 0
                         )
 
+
                         marca_edit = st.selectbox(
                             "Marca",
                             lista_marcas,
@@ -586,15 +848,19 @@ elif menu == "💻 Equipos":
                             f"{x} - {dic_marcas[x]}"
                         )
 
+
                         estados = [
                             "Operativo",
                             "Mantenimiento",
                             "Inoperativo"
                         ]
 
+
                         estado_actual = equipo.get(
-                            "estado"
+                            "estado",
+                            "Operativo"
                         )
+
 
                         indice_estado = (
                             estados.index(
@@ -605,11 +871,13 @@ elif menu == "💻 Equipos":
                             else 0
                         )
 
+
                         estado_edit = st.selectbox(
                             "Estado",
                             estados,
                             index=indice_estado
                         )
+
 
                         cantidad_edit = st.number_input(
                             "Cantidad",
@@ -619,8 +887,10 @@ elif menu == "💻 Equipos":
                                     "cantidad",
                                     1
                                 )
-                            )
+                            ),
+                            step=1
                         )
+
 
                     with col2:
 
@@ -628,11 +898,13 @@ elif menu == "💻 Equipos":
                             dic_responsables.keys()
                         )
 
+
                         responsable_actual = (
                             equipo.get(
                                 "responsable"
                             )
                         )
+
 
                         indice_resp = (
                             lista_resp.index(
@@ -643,6 +915,7 @@ elif menu == "💻 Equipos":
                             else 0
                         )
 
+
                         responsable_edit = st.selectbox(
                             "Responsable",
                             lista_resp,
@@ -651,45 +924,56 @@ elif menu == "💻 Equipos":
                             f"{x} - {dic_responsables[x]}"
                         )
 
+
                         fecha_adq = st.date_input(
-                            "Fecha adquisición",
-                            value=pd.to_datetime(
-                                equipo[
+                            "Fecha de adquisición",
+                            value=fecha_segura(
+                                equipo.get(
                                     "fecha_adquisicion"
-                                ]
-                            ).date()
+                                )
+                            )
                         )
+
 
                         fecha_ult = st.date_input(
                             "Último mantenimiento",
-                            value=pd.to_datetime(
-                                equipo[
+                            value=fecha_segura(
+                                equipo.get(
                                     "fecha_ult_mant"
-                                ]
-                            ).date()
+                                )
+                            )
                         )
 
-                        fecha_prox = st.date_input(
+
+                        fecha_prox = (
+                            fecha_ult
+                            + relativedelta(months=12)
+                        )
+
+
+                        st.date_input(
                             "Próximo mantenimiento",
-                            value=pd.to_datetime(
-                                equipo[
-                                    "fecha_prox_mant"
-                                ]
-                            ).date()
+                            value=fecha_prox,
+                            disabled=True
                         )
 
-                    guardar_cambios = st.form_submit_button(
-                        "💾 Guardar cambios",
-                        use_container_width=True
+
+                    guardar_cambios = (
+                        st.form_submit_button(
+                            "💾 Guardar cambios",
+                            use_container_width=True
+                        )
                     )
+
 
                     if guardar_cambios:
 
                         try:
 
                             datos = {
+
                                 "descripcion":
-                                    descripcion_edit,
+                                    descripcion_edit.strip(),
 
                                 "marca":
                                     marca_edit,
@@ -713,6 +997,7 @@ elif menu == "💻 Equipos":
                                     cantidad_edit
                             }
 
+
                             (
                                 supabase
                                 .table("EQUIPOS LAB")
@@ -724,11 +1009,14 @@ elif menu == "💻 Equipos":
                                 .execute()
                             )
 
+
                             st.success(
                                 "✅ Equipo actualizado."
                             )
 
+
                             st.rerun()
+
 
                         except Exception as e:
 
@@ -736,22 +1024,26 @@ elif menu == "💻 Equipos":
                                 f"Error: {e}"
                             )
 
+
         else:
+
             st.info(
                 "No existen equipos registrados."
             )
 
+
     # =====================================================
-    # DELETE
+    # ELIMINAR
     # =====================================================
     with tab4:
 
         st.subheader("🗑️ Eliminar equipo")
 
+
         if equipos:
 
             codigo_eliminar = st.selectbox(
-                "Selecciona un equipo",
+                "Seleccionar equipo",
                 [
                     e["codigo"]
                     for e in equipos
@@ -759,25 +1051,52 @@ elif menu == "💻 Equipos":
                 key="eliminar_equipo"
             )
 
+
             equipo = next(
                 e for e in equipos
                 if e["codigo"] == codigo_eliminar
             )
 
-            st.warning(
-                f"Vas a eliminar: "
-                f"{equipo['codigo']} - "
-                f"{equipo['descripcion']}"
+
+            marca_nombre = dic_marcas.get(
+                equipo.get("marca"),
+                equipo.get("marca")
             )
+
+
+            responsable_nombre = (
+                dic_responsables.get(
+                    equipo.get("responsable"),
+                    equipo.get("responsable")
+                )
+            )
+
+
+            st.warning(
+                f"""
+                Estás a punto de eliminar:
+
+                **Código:** {equipo["codigo"]}
+
+                **Descripción:** {equipo["descripcion"]}
+
+                **Marca:** {marca_nombre}
+
+                **Responsable:** {responsable_nombre}
+                """
+            )
+
 
             confirmar = st.checkbox(
                 "Confirmo que deseo eliminar este equipo"
             )
 
+
             if st.button(
                 "🗑️ Eliminar equipo",
                 disabled=not confirmar,
-                type="primary"
+                type="primary",
+                use_container_width=True
             ):
 
                 try:
@@ -793,19 +1112,24 @@ elif menu == "💻 Equipos":
                         .execute()
                     )
 
+
                     st.success(
                         "✅ Equipo eliminado."
                     )
 
+
                     st.rerun()
 
+
                 except Exception as e:
+
                     st.error(
                         f"Error: {e}"
                     )
 
+
 # =========================================================
-# MÓDULO MARCAS
+# MARCAS
 # =========================================================
 elif menu == "🏷️ Marcas":
 
@@ -814,23 +1138,35 @@ elif menu == "🏷️ Marcas":
         unsafe_allow_html=True
     )
 
+
     tab1, tab2, tab3 = st.tabs([
         "📋 Ver marcas",
         "➕ Agregar",
         "🗑️ Eliminar"
     ])
 
+
     with tab1:
 
-        st.subheader("Marcas registradas")
+        st.subheader("📋 Marcas registradas")
+
 
         if marcas:
 
+            df_marcas = pd.DataFrame(marcas)
+
+            df_marcas.columns = [
+                "Código",
+                "Marca"
+            ]
+
+
             st.dataframe(
-                pd.DataFrame(marcas),
+                df_marcas,
                 use_container_width=True,
                 hide_index=True
             )
+
 
         else:
 
@@ -838,9 +1174,11 @@ elif menu == "🏷️ Marcas":
                 "No existen marcas registradas."
             )
 
+
     with tab2:
 
         st.subheader("➕ Registrar nueva marca")
+
 
         with st.form(
             "form_marca",
@@ -852,39 +1190,48 @@ elif menu == "🏷️ Marcas":
                 placeholder="Ejemplo: M05"
             )
 
+
             nombre_marca = st.text_input(
                 "Marca",
                 placeholder="Ejemplo: Acer"
             )
+
 
             agregar = st.form_submit_button(
                 "💾 Guardar marca",
                 use_container_width=True
             )
 
+
             if agregar:
 
-                if codigo_marca.strip() == "":
+                if not codigo_marca.strip():
+
                     st.warning(
                         "Ingrese el código."
                     )
 
-                elif nombre_marca.strip() == "":
+
+                elif not nombre_marca.strip():
+
                     st.warning(
                         "Ingrese el nombre de la marca."
                     )
+
 
                 else:
 
                     try:
 
                         datos = {
+
                             "codigo_marca":
                                 codigo_marca.upper().strip(),
 
                             "marca":
                                 nombre_marca.strip()
                         }
+
 
                         (
                             supabase
@@ -893,79 +1240,105 @@ elif menu == "🏷️ Marcas":
                             .execute()
                         )
 
+
                         st.success(
                             "✅ Marca registrada."
                         )
 
+
                         st.rerun()
+
 
                     except Exception as e:
 
                         st.error(
-                            f"Error al registrar marca: {e}"
+                            f"Error: {e}"
                         )
+
 
     with tab3:
 
         st.subheader("🗑️ Eliminar marca")
 
-        if marcas:
 
-            opciones = [
-                m["codigo_marca"]
-                for m in marcas
-            ]
+        if marcas:
 
             marca_eliminar = st.selectbox(
                 "Seleccionar marca",
-                opciones,
+                list(dic_marcas.keys()),
                 format_func=lambda x:
                 f"{x} - {dic_marcas[x]}"
             )
 
-            st.warning(
-                "No podrás eliminar una marca si está "
-                "siendo utilizada por algún equipo."
-            )
+
+            uso_marca = [
+                e for e in equipos
+                if e.get("marca")
+                == marca_eliminar
+            ]
+
+
+            if uso_marca:
+
+                st.warning(
+                    f"Esta marca está siendo utilizada por "
+                    f"{len(uso_marca)} registro(s) de equipos."
+                )
+
 
             confirmar = st.checkbox(
                 "Confirmo eliminar la marca",
                 key="confirmar_marca"
             )
 
+
             if st.button(
-                "Eliminar marca",
+                "🗑️ Eliminar marca",
                 disabled=not confirmar,
                 key="btn_eliminar_marca"
             ):
 
-                try:
-
-                    (
-                        supabase
-                        .table("marcas")
-                        .delete()
-                        .eq(
-                            "codigo_marca",
-                            marca_eliminar
-                        )
-                        .execute()
-                    )
-
-                    st.success(
-                        "✅ Marca eliminada."
-                    )
-
-                    st.rerun()
-
-                except Exception as e:
+                if uso_marca:
 
                     st.error(
-                        f"No se pudo eliminar: {e}"
+                        "No puedes eliminar esta marca porque "
+                        "está siendo utilizada por equipos."
                     )
 
+
+                else:
+
+                    try:
+
+                        (
+                            supabase
+                            .table("marcas")
+                            .delete()
+                            .eq(
+                                "codigo_marca",
+                                marca_eliminar
+                            )
+                            .execute()
+                        )
+
+
+                        st.success(
+                            "✅ Marca eliminada."
+                        )
+
+
+                        st.rerun()
+
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error: {e}"
+                        )
+
+
 # =========================================================
-# MÓDULO RESPONSABLES
+# RESPONSABLES
 # =========================================================
 elif menu == "👤 Responsables":
 
@@ -974,25 +1347,37 @@ elif menu == "👤 Responsables":
         unsafe_allow_html=True
     )
 
+
     tab1, tab2, tab3 = st.tabs([
         "📋 Ver responsables",
         "➕ Agregar",
         "🗑️ Eliminar"
     ])
 
+
     with tab1:
 
         st.subheader(
-            "Responsables registrados"
+            "📋 Responsables registrados"
         )
+
 
         if responsables:
 
+            df_resp = pd.DataFrame(responsables)
+
+            df_resp.columns = [
+                "Código",
+                "Responsable"
+            ]
+
+
             st.dataframe(
-                pd.DataFrame(responsables),
+                df_resp,
                 use_container_width=True,
                 hide_index=True
             )
+
 
         else:
 
@@ -1000,11 +1385,13 @@ elif menu == "👤 Responsables":
                 "No existen responsables registrados."
             )
 
+
     with tab2:
 
         st.subheader(
             "➕ Registrar responsable"
         )
+
 
         with st.form(
             "form_responsable",
@@ -1016,39 +1403,48 @@ elif menu == "👤 Responsables":
                 placeholder="Ejemplo: R05"
             )
 
+
             nombre_responsable = st.text_input(
                 "Nombre del responsable",
                 placeholder="Ejemplo: Pedro Arévalo"
             )
+
 
             guardar = st.form_submit_button(
                 "💾 Guardar responsable",
                 use_container_width=True
             )
 
+
             if guardar:
 
-                if codigo_responsable.strip() == "":
+                if not codigo_responsable.strip():
+
                     st.warning(
                         "Ingrese el código."
                     )
 
-                elif nombre_responsable.strip() == "":
+
+                elif not nombre_responsable.strip():
+
                     st.warning(
                         "Ingrese el nombre."
                     )
+
 
                 else:
 
                     try:
 
                         datos = {
+
                             "codigo_responsable":
                                 codigo_responsable.upper().strip(),
 
                             "responsable":
                                 nombre_responsable.strip()
                         }
+
 
                         (
                             supabase
@@ -1057,11 +1453,14 @@ elif menu == "👤 Responsables":
                             .execute()
                         )
 
+
                         st.success(
                             "✅ Responsable registrado."
                         )
 
+
                         st.rerun()
+
 
                     except Exception as e:
 
@@ -1069,63 +1468,91 @@ elif menu == "👤 Responsables":
                             f"Error: {e}"
                         )
 
+
     with tab3:
 
         st.subheader(
             "🗑️ Eliminar responsable"
         )
 
+
         if responsables:
 
-            opciones = [
-                r["codigo_responsable"]
-                for r in responsables
+            responsable_eliminar = (
+                st.selectbox(
+                    "Seleccionar responsable",
+                    list(
+                        dic_responsables.keys()
+                    ),
+                    format_func=lambda x:
+                    f"{x} - "
+                    f"{dic_responsables[x]}"
+                )
+            )
+
+
+            uso_responsable = [
+                e for e in equipos
+                if e.get("responsable")
+                == responsable_eliminar
             ]
 
-            responsable_eliminar = st.selectbox(
-                "Seleccionar responsable",
-                opciones,
-                format_func=lambda x:
-                f"{x} - {dic_responsables[x]}"
-            )
 
-            st.warning(
-                "No podrás eliminar un responsable si "
-                "está asignado a algún equipo."
-            )
+            if uso_responsable:
+
+                st.warning(
+                    f"Este responsable está asignado a "
+                    f"{len(uso_responsable)} registro(s) "
+                    f"de equipos."
+                )
+
 
             confirmar = st.checkbox(
                 "Confirmo eliminar el responsable",
                 key="confirmar_resp"
             )
 
+
             if st.button(
-                "Eliminar responsable",
+                "🗑️ Eliminar responsable",
                 disabled=not confirmar,
                 key="btn_eliminar_resp"
             ):
 
-                try:
-
-                    (
-                        supabase
-                        .table("responsables")
-                        .delete()
-                        .eq(
-                            "codigo_responsable",
-                            responsable_eliminar
-                        )
-                        .execute()
-                    )
-
-                    st.success(
-                        "✅ Responsable eliminado."
-                    )
-
-                    st.rerun()
-
-                except Exception as e:
+                if uso_responsable:
 
                     st.error(
-                        f"No se pudo eliminar: {e}"
+                        "No puedes eliminar este responsable "
+                        "porque está asignado a equipos."
                     )
+
+
+                else:
+
+                    try:
+
+                        (
+                            supabase
+                            .table("responsables")
+                            .delete()
+                            .eq(
+                                "codigo_responsable",
+                                responsable_eliminar
+                            )
+                            .execute()
+                        )
+
+
+                        st.success(
+                            "✅ Responsable eliminado."
+                        )
+
+
+                        st.rerun()
+
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error: {e}"
+                        )
